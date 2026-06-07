@@ -1,14 +1,28 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAdminAuth } from '@/hooks/use-admin-auth';
 
+const PAGE_NAMES: Record<string, string> = {
+  'members': 'Members',
+  'light-bill': 'Light Bill',
+  'sweeping': 'Sweeping',
+  'environmental': 'Environmental',
+  'electricity': 'Electricity',
+};
+
 export default function AdminGuard({ children }: { children: React.ReactNode }) {
   const { isLoggedIn, checked, login, logout } = useAdminAuth();
+  const pathname = usePathname();
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const segments = pathname.split('/').filter(Boolean); // ['admin', 'members']
+  const currentPage = segments.length > 1 ? PAGE_NAMES[segments[1]] || segments[1] : null;
 
   if (!checked) {
     return (
@@ -68,10 +82,27 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Header with breadcrumb */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-semibold text-gray-900">Admin Panel</h1>
+        <div className="px-4 py-3 flex justify-between items-center">
+          <div>
+            {/* Breadcrumb */}
+            <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-1">
+              <Link href="/admin" className="hover:text-gray-600">Admin</Link>
+              {currentPage && (
+                <>
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                  <span className="text-gray-700 font-medium">{currentPage}</span>
+                </>
+              )}
+            </div>
+            {/* Page title */}
+            <h1 className="text-lg font-semibold text-gray-900">
+              {currentPage || 'Admin Panel'}
+            </h1>
+          </div>
           <button
             onClick={logout}
             className="text-sm text-gray-500 hover:text-gray-700"
