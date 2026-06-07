@@ -44,7 +44,17 @@ export const environmentalPayments = pgTable('environmental_payments', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-// Electricity: Top-ups (when you buy units)
+// Electricity: one table for every observation, fully decoupled
+export const electricityObservations = pgTable('electricity_observations', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  type: text('type', { enum: ['meter_reading', 'units_remaining', 'current_load', 'topup'] }).notNull(),
+  value: real('value').notNull(),
+  recordedAt: timestamp('recorded_at').defaultNow().notNull(),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Keep old table references for migration compatibility (no data to lose)
 export const electricityTopups = pgTable('electricity_topups', {
   id: uuid('id').defaultRandom().primaryKey(),
   amountNaira: integer('amount_naira').notNull(),

@@ -1,82 +1,97 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { electricityReadings, electricityTopups, siteSettings } from '@/lib/schema';
-import { sql } from 'drizzle-orm';
+import { electricityObservations, siteSettings } from '@/lib/schema';
+import { sql, eq, asc } from 'drizzle-orm';
 
 export async function GET() {
   try {
-    // Get rate from settings
-    const settingsRows = await db.select().from(siteSettings).where(sql`${siteSettings.key} = 'electricity_rate'`);
+    const settingsRows = await db.select().from(siteSettings).where(eq(siteSettings.key, 'electricity_rate'));
     const rate = settingsRows.length > 0 ? parseFloat(settingsRows[0].value) : 73.5;
 
-    // Get latest reading with units_remaining
-    const latestReading = await db.select().from(electricityReadings)
-      .where(sql`${electricityReadings.unitsRemaining} IS NOT NULL`)
-      .orderBy(sql`${electricityReadings.remainingTime} DESC`)
+    // Latest meter reading (cumulative kWh)
+    const latestMeter = await db.select().from(electricityObservations)
+      .where(sql`${electricityObservations.type} = 'meter_reading'`)
+      .orderBy(sql`${electricityObservations.recordedAt} DESC`)
       .limit(1);
 
-    // Get all readings with both values for consumption calculation
-    const allReadings = await db.select().from(electricityReadings)
-      .where(sql`${electricityReadings.meterReading} IS NOT NULL AND ${electricityReadings.unitsRemaining} IS NOT NULL`)
-      .orderBy(sql`${electricityReadings.readingTime} ASC`);
+    // Latest units remaining
+    const latestRemaining = await db.select().from(electricityObservations)
+      .where(sql`${electricityObservations.type} = 'units_remaining'`)
+      .orderBy(sql`${electricityObservations.recordedAt} DESC`)
+      .limit(1);
 
-    // Get total top-ups in last 30 days
-    const recentTopups = await db.select().from(electricityTopups)
-      .where(sql`${electricityTopups.recordedAt} >= NOW() - INTERVAL '30 days'`);
-    const totalTopupUnits = recentTopups.reduce((sum, t) => sum + t.unitsKwh, 0);
-    const totalTopupNaira = recentTopups.reduce((sum, t) => sum + t.amountNaira, 0);
+    // Latest current load
+    const latestLoad = await db.select().from(electricityObservations)
+      .where(sql`${electricityObservations.type} = 'current_load'`)
+      .orderBy(sql`${electricityObservations.recordedAt} DESC`)
+      .limit(1);
 
-    // Calculate consumption rate (kWh per day) from recent paired readings
+    // Recent top-ups (30 days)
+    const recentTopups = await db.select().from(electricityObservations)
+      .where(sql`${electricityObservations.type} = 'topup' AND ${electricityObservations.recordedAt} >= NOW() - INTERVAL '30 days'`);
+
+    // Consumption rate: use meter readings to calculate kWh/day
+    const meterReadingsOverTime = await db.select().from(electricityObservations)
+      .where(sql`${electricityObservations.type} = 'meter_reading'`)
+      .orderBy(asc(electricityObservations.recordedAt));
+
     let consumptionRateKwhPerDay = 0;
-    if (allReadings.length >= 2) {
-      const latest = allReadings[allReadings.length - 1];
-      const previous = allReadings[allReadings.length - 2];
-      const kwhUsed = (previous.unitsRemaining || 0) - (latest.unitsRemaining || 0);
-      const timeDiffMs = new Date(latest.readingTime || latest.createdAt).getTime() - new Date(previous.readingTime || previous.createdAt).getTime();
+    let estimatedDaysLeft: number | null = null;
+    let currentRemaining = 0;
+
+    if (meterReadingsOverTime.length >= 2) {
+      const latest = meterReadingsOverTime[meterReadingsOverTime.length - 1];
+      const previous = meterReadingsOverTime[meterReadingsOverTime.length - 2];
+      const unitsUsed = latest.value - previous.value;
+      const timeDiffMs = new Date(latest.recordedAt).getTime() - new Date(previous.recordedAt).getTime();
       const timeDiffDays = timeDiffMs / (1000 * 60 * 60 * 24);
-      if (timeDiffDays > 0 && kwhUsed > 0) {
-        consumptionRateKwhPerDay = Math.round((kwhUsed / timeDiffDays) * 100) / 100;
+      if (timeDiffDays > 0 && unitsUsed >= 0) {
+        consumptionRateKwhPerDay = Math.round((unitsUsed / timeDiffDays) * 100) / 100;
       }
     }
 
-    // Current remaining units
-    const currentRemaining = latestReading.length > 0 ? latestReading[0].unitsRemaining : 0;
-    const lastReadingTime = latestReading.length > 0 ? latestReading[0].remainingTime : null;
+    if (latestRemaining.length > 0) {
+      currentRemaining = latestRemaining[0].value;
+      if (consumptionRateKwhPerDay > 0) {
+        estimatedDaysLeft = Math.round((currentRemaining / consumptionRateKwhPerDay) * 10) / 10;
+      }
+    }
 
-    // Estimated days remaining
-    const estimatedDaysLeft = consumptionRateKwhPerDay > 0 && currentRemaining
-      ? Math.round((currentRemaining / consumptionRateKwhPerDay) * 10) / 10
-      : null;
+    const latestLoadValue = latestLoad.length > 0 ? latestLoad[0].value : null;
+    const latestLoadTime = latestLoad.length > 0 ? latestLoad[0].recordedAt : null;
 
-    // Cost per day
-    const costPerDay = consumptionRateKwhPerDay > 0
-      ? Math.round(consumptionRateKwhPerDay * rate)
-      : 0;
+    const totalTopupKwh = recentTopups.reduce((sum, t) => sum + t.value, 0);
+    const costPerDay = consumptionRateKwhPerDay > 0 ? Math.round(consumptionRateKwhPerDay * rate) : 0;
 
     return NextResponse.json({
       rate,
-      currentRemaining: currentRemaining || 0,
-      lastReadingTime,
+      currentMeterReading: latestMeter.length > 0 ? latestMeter[0].value : null,
+      currentMeterTime: latestMeter.length > 0 ? latestMeter[0].recordedAt : null,
+      currentRemaining,
+      remainingTime: latestRemaining.length > 0 ? latestRemaining[0].recordedAt : null,
+      currentLoad: latestLoadValue,
+      currentLoadTime: latestLoadTime,
       consumptionRateKwhPerDay,
       estimatedDaysLeft,
       costPerDay,
       recentTopups: {
         count: recentTopups.length,
-        totalUnits: Math.round(totalTopupUnits * 100) / 100,
-        totalNaira: totalTopupNaira,
+        totalKwh: Math.round(totalTopupKwh * 100) / 100,
       },
-      totalReadings: allReadings.length,
     });
   } catch (error) {
     return NextResponse.json({
       rate: 73.5,
+      currentMeterReading: null,
+      currentMeterTime: null,
       currentRemaining: 0,
-      lastReadingTime: null,
+      remainingTime: null,
+      currentLoad: null,
+      currentLoadTime: null,
       consumptionRateKwhPerDay: 0,
       estimatedDaysLeft: null,
       costPerDay: 0,
-      recentTopups: { count: 0, totalUnits: 0, totalNaira: 0 },
-      totalReadings: 0,
+      recentTopups: { count: 0, totalKwh: 0 },
     });
   }
 }

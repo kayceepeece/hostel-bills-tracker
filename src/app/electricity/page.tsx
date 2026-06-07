@@ -5,60 +5,65 @@ import { Card, CardContent } from '@/components/ui/card';
 
 interface Summary {
   rate: number;
+  currentMeterReading: number | null;
+  currentMeterTime: string | null;
   currentRemaining: number;
-  lastReadingTime: string | null;
+  remainingTime: string | null;
+  currentLoad: number | null;
+  currentLoadTime: string | null;
   consumptionRateKwhPerDay: number;
   estimatedDaysLeft: number | null;
   costPerDay: number;
-  recentTopups: { count: number; totalUnits: number; totalNaira: number };
-  totalReadings: number;
+  recentTopups: { count: number; totalKwh: number };
 }
 
-interface Topup {
+interface Observation {
   id: string;
-  amountNaira: number;
-  unitsKwh: number;
+  type: string;
+  value: number;
   recordedAt: string;
+  notes: string | null;
 }
 
-interface Reading {
-  id: string;
-  meterReading: number | null;
-  readingTime: string | null;
-  unitsRemaining: number | null;
-  remainingTime: string | null;
+const COLORS: Record<string, string> = {
+  meter_reading: '\u{1F522}',
+  units_remaining: '\u{26FD}',
+  current_load: '\u{26A1}',
+  topup: '\u{1F4B0}',
+};
+
+const LABELS: Record<string, string> = {
+  meter_reading: 'Meter Reading',
+  units_remaining: 'Remaining',
+  current_load: 'Load',
+  topup: 'Top-Up',
+};
+
+function StatusBadge({ days }: { days: number | null }) {
+  if (days === null) return <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">No data</span>;
+  if (days < 3) return <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700">🔴 ~{days} days left</span>;
+  if (days < 7) return <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700">🟡 ~{days} days left</span>;
+  return <span className="px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">🟢 ~{days} days left</span>;
 }
 
-function formatTs(ts: string | null) {
+function fmt(ts: string | null) {
   if (!ts) return '—';
   return new Date(ts).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-function StatusBadge({ days }: { days: number | null }) {
-  if (days === null) return <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">No data</span>;
-  if (days < 3) return <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700">🔴 Low — {days} days left</span>;
-  if (days < 7) return <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700">🟡 {days} days left</span>;
-  return <span className="px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">🟢 {days} days left</span>;
-}
-
 export default function ElectricityPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [topups, setTopups] = useState<Topup[]>([]);
-  const [readings, setReadings] = useState<Reading[]>([]);
+  const [observations, setObservations] = useState<Observation[]>([]);
 
   useEffect(() => {
     Promise.all([
       fetch('/api/electricity/summary').then(r => r.json()),
-      fetch('/api/electricity/topups').then(r => r.json()),
-      fetch('/api/electricity/readings').then(r => r.json()),
-    ]).then(([s, t, r]) => {
+      fetch('/api/electricity/observations').then(r => r.json()),
+    ]).then(([s, o]) => {
       setSummary(s);
-      setTopups(t);
-      setReadings(r);
+      setObservations(o);
     }).catch(console.error);
   }, []);
-
-  const formatAmount = (amount: number) => `₦${amount.toLocaleString()}`;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -74,21 +79,27 @@ export default function ElectricityPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold text-gray-900">Current Status</h2>
+              <h2 className="font-semibold text-gray-900">Live Status</h2>
               <StatusBadge days={summary?.estimatedDaysLeft ?? null} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Units Remaining</p>
-                <p className="text-2xl font-bold text-gray-900">{summary?.currentRemaining ?? 0} kWh</p>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500">🔢 Meter Reading</span>
+                <span className="font-semibold text-gray-900">{summary?.currentMeterReading ?? '—'} kWh</span>
               </div>
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Rate</p>
-                <p className="text-2xl font-bold text-gray-900">₦{summary?.rate ?? 0}/kWh</p>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500">⛽ Units Remaining</span>
+                <span className="font-semibold text-gray-900">{summary?.currentRemaining ?? 0} kWh</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500">⚡ Current Load</span>
+                <span className="font-semibold text-gray-900">
+                  {summary && summary.currentLoad !== null ? `${summary.currentLoad} kW` : '—'}
+                </span>
               </div>
             </div>
-            {summary?.lastReadingTime && (
-              <p className="text-xs text-gray-400 mt-2">Last reading: {formatTs(summary.lastReadingTime)}</p>
+            {summary?.currentMeterTime && (
+              <p className="text-xs text-gray-400 mt-2">Last reading: {fmt(summary.currentMeterTime)}</p>
             )}
           </CardContent>
         </Card>
@@ -97,72 +108,52 @@ export default function ElectricityPage() {
         <Card>
           <CardContent className="p-4">
             <h2 className="font-semibold text-gray-900 mb-3">Consumption</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Usage Rate</p>
-                <p className="text-lg font-bold text-gray-900">{summary?.consumptionRateKwhPerDay ?? 0} kWh/day</p>
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Rate</span>
+                <span className="font-semibold text-gray-900">{summary?.consumptionRateKwhPerDay ?? 0} kWh/day</span>
               </div>
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Cost/Day</p>
-                <p className="text-lg font-bold text-gray-900">{formatAmount(summary?.costPerDay ?? 0)}</p>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Cost</span>
+                <span className="font-semibold text-gray-900">₦{summary?.costPerDay ?? 0}/day</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Rate</span>
+                <span className="font-semibold text-gray-900">₦{summary?.rate ?? 0}/kWh</span>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Top-Up Summary */}
+        {/* Top-ups Card */}
         <Card>
           <CardContent className="p-4">
-            <h2 className="font-semibold text-gray-900 mb-3">Recent Top-Ups (30 days)</h2>
-            <div className="grid grid-cols-3 gap-4 text-center">
+            <h2 className="font-semibold text-gray-900 mb-3">Top-Ups (30 days)</h2>
+            <div className="grid grid-cols-2 gap-4 text-center">
               <div>
                 <p className="text-xs text-gray-500">Purchases</p>
                 <p className="text-lg font-bold text-gray-900">{summary?.recentTopups.count ?? 0}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Total Units</p>
-                <p className="text-lg font-bold text-gray-900">{summary?.recentTopups.totalUnits ?? 0}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Total Spent</p>
-                <p className="text-lg font-bold text-gray-900">{formatAmount(summary?.recentTopups.totalNaira ?? 0)}</p>
+                <p className="text-xs text-gray-500">Total kWh</p>
+                <p className="text-lg font-bold text-gray-900">{summary?.recentTopups.totalKwh ?? 0}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Recent Top-Ups */}
-        <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Top-Up History</h3>
-        {topups.length === 0 ? (
-          <Card><CardContent className="py-8 text-center text-gray-500">No top-ups recorded</CardContent></Card>
-        ) : topups.slice(0, 10).map(t => (
-          <Card key={t.id}>
-            <CardContent className="p-4 flex justify-between items-center">
-              <div>
-                <p className="font-medium text-gray-900">₦{t.amountNaira.toLocaleString()} → {t.unitsKwh} kWh</p>
-                <p className="text-xs text-gray-500">{formatTs(t.recordedAt)}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-
-        {/* Recent Readings */}
-        <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Meter Observations</h3>
-        {readings.length === 0 ? (
-          <Card><CardContent className="py-8 text-center text-gray-500">No meter observations recorded</CardContent></Card>
-        ) : readings.slice(0, 10).map(r => (
-          <Card key={r.id}>
-            <CardContent className="p-4">
-              <div className="grid grid-cols-2 gap-4">
+        {/* Observation Feed */}
+        <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Observation Log</h3>
+        {observations.length === 0 ? (
+          <Card><CardContent className="py-8 text-center text-gray-500">No observations yet</CardContent></Card>
+        ) : observations.slice(0, 20).map(o => (
+          <Card key={o.id}>
+            <CardContent className="p-3 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <span className="text-base">{COLORS[o.type] || '📝'}</span>
                 <div>
-                  <p className="text-xs text-gray-500">Meter Reading</p>
-                  <p className="font-medium text-gray-900">{r.meterReading !== null ? `${r.meterReading} kWh` : '—'}</p>
-                  <p className="text-[10px] text-gray-400">{formatTs(r.readingTime)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Remaining</p>
-                  <p className="font-medium text-gray-900">{r.unitsRemaining !== null ? `${r.unitsRemaining} kWh` : '—'}</p>
-                  <p className="text-[10px] text-gray-400">{formatTs(r.remainingTime)}</p>
+                  <p className="text-sm font-medium text-gray-900">{o.value} {o.type === 'topup' ? 'kWh' : o.type === 'current_load' ? 'kW' : 'kWh'}</p>
+                  <p className="text-xs text-gray-500">{LABELS[o.type] || o.type} • {fmt(o.recordedAt)}</p>
                 </div>
               </div>
             </CardContent>
