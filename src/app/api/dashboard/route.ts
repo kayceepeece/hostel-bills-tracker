@@ -46,30 +46,55 @@ export async function GET(request: Request) {
     const recentTopups = await db.select().from(electricityObservations)
       .where(sql`${electricityObservations.type} = 'topup' AND ${electricityObservations.recordedAt} >= NOW() - INTERVAL '30 days'`);
 
-    // Consumption rate from meter readings
-    const meterReadings = await db.select().from(electricityObservations)
-      .where(sql`${electricityObservations.type} = 'meter_reading'`)
-      .orderBy(sql`${electricityObservations.recordedAt} ASC`);
-
-    let consumptionRate = 0;
+    // ---- CONSUMPTION: 3-method calculation ----
+    const currentRemaining = latestRemaining.length > 0 ? latestRemaining[0].value : 0;
+    const currentLoadValue = latestLoad.length > 0 ? latestLoad[0].value : null;
     let estimatedDaysLeft: number | null = null;
-    if (meterReadings.length >= 2) {
-      const latest = meterReadings[meterReadings.length - 1];
-      const previous = meterReadings[meterReadings.length - 2];
-      const unitsUsed = latest.value - previous.value;
-      const timeDiffMs = new Date(latest.recordedAt).getTime() - new Date(previous.recordedAt).getTime();
-      const timeDiffDays = timeDiffMs / (1000 * 60 * 60 * 24);
-      if (timeDiffDays > 0 && unitsUsed >= 0) {
-        consumptionRate = Math.round((unitsUsed / timeDiffDays) * 100) / 100;
-        const remaining = latestRemaining.length > 0 ? latestRemaining[0].value : 0;
-        if (remaining > 0 && consumptionRate > 0) {
-          estimatedDaysLeft = Math.round((remaining / consumptionRate) * 10) / 10;
+    let consumptionRate = 0;
+
+    // Method 1: Current Load (instant × 24h)
+    if (currentLoadValue && currentLoadValue > 0) {
+      consumptionRate = Math.round(currentLoadValue * 24 * 100) / 100;
+    }
+
+    // Method 2: Balance (total topups minus remaining, ÷ days)
+    if (consumptionRate === 0) {
+      const allTopups = await db.select().from(electricityObservations)
+        .where(sql`${electricityObservations.type} = 'topup'`)
+        .orderBy(sql`${electricityObservations.recordedAt} ASC`);
+
+      if (allTopups.length > 0) {
+        const totalTopup = allTopups.reduce((s, t) => s + t.value, 0);
+        const daysSinceFirst = Math.max(1, (Date.now() - new Date(allTopups[0].recordedAt).getTime()) / (1000 * 60 * 60 * 24));
+        if (currentRemaining > 0) {
+          const consumed = totalTopup - currentRemaining;
+          if (consumed > 0) consumptionRate = Math.round((consumed / daysSinceFirst) * 100) / 100;
+        }
+        if (consumptionRate === 0) {
+          consumptionRate = Math.round((totalTopup / daysSinceFirst) * 100) / 100;
         }
       }
     }
 
-    const currentRemaining = latestRemaining.length > 0 ? latestRemaining[0].value : 0;
-    const currentLoadValue = latestLoad.length > 0 ? latestLoad[0].value : null;
+    // Method 3: Meter readings (needs 2+ readings)
+    if (consumptionRate === 0) {
+      const meterReadings = await db.select().from(electricityObservations)
+        .where(sql`${electricityObservations.type} = 'meter_reading'`)
+        .orderBy(sql`${electricityObservations.recordedAt} ASC`);
+      if (meterReadings.length >= 2) {
+        const latest = meterReadings[meterReadings.length - 1];
+        const previous = meterReadings[meterReadings.length - 2];
+        const unitsUsed = latest.value - previous.value;
+        const timeDiffDays = (new Date(latest.recordedAt).getTime() - new Date(previous.recordedAt).getTime()) / (1000 * 60 * 60 * 24);
+        if (timeDiffDays > 0 && unitsUsed >= 0) {
+          consumptionRate = Math.round((unitsUsed / timeDiffDays) * 100) / 100;
+        }
+      }
+    }
+
+    if (currentRemaining > 0 && consumptionRate > 0) {
+      estimatedDaysLeft = Math.round((currentRemaining / consumptionRate) * 10) / 10;
+    }
 
     // Calculate summaries
     const lightBillCollected = lightBill.reduce((sum, p) => sum + p.amount, 0);

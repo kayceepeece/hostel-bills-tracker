@@ -54,39 +54,7 @@ export const electricityObservations = pgTable('electricity_observations', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-// Keep old table references for migration compatibility (no data to lose)
-export const electricityTopups = pgTable('electricity_topups', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  amountNaira: integer('amount_naira').notNull(),
-  unitsKwh: real('units_kwh').notNull(),
-  rateUsed: real('rate_used').notNull(),
-  recordedAt: timestamp('recorded_at').defaultNow().notNull(),
-  notes: text('notes'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-
-// Electricity: Meter observations (two independent screens)
-export const electricityReadings = pgTable('electricity_readings', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  meterReading: real('meter_reading'),          // screen 1: cumulative kWh
-  readingTime: timestamp('reading_time'),        // when screen 1 was observed
-  unitsRemaining: real('units_remaining'),       // screen 2: kWh remaining
-  remainingTime: timestamp('remaining_time'),    // when screen 2 was observed
-  notes: text('notes'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-
-// Keep old table reference for migration compatibility
-export const electricityUsage = pgTable('electricity_usage', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  date: date('date').notNull(),
-  meterReading: integer('meter_reading').notNull(),
-  unitsUsed: integer('units_used').notNull(),
-  bought: integer('bought').notNull(),
-  remaining: integer('remaining').notNull(),
-  notes: text('notes'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+// Old tables removed — all observation data lives in electricity_observations
 
 export const siteSettings = pgTable('site_settings', {
   id: uuid('id').defaultRandom().primaryKey(),
