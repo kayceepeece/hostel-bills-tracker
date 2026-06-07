@@ -188,7 +188,6 @@ export default function Dashboard() {
           </Card>
         </Link>
       </div>
-
-
+    </div>
   );
 }
