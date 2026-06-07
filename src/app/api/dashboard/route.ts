@@ -72,7 +72,11 @@ export async function GET(request: Request) {
         ...lightBill.map(p => ({ ...p, type: 'light' })),
         ...sweeping.map(p => ({ ...p, type: 'sweeping' })),
         ...environmental.map(p => ({ ...p, type: 'environmental' })),
-      ].sort((a, b) => new Date(b.datePaid).getTime() - new Date(a.datePaid).getTime()).slice(0, 10),
+      ].sort((a, b) => {
+        const dateA = a.datePaid ? new Date(a.datePaid).getTime() : 0;
+        const dateB = b.datePaid ? new Date(b.datePaid).getTime() : 0;
+        return dateB - dateA;
+      }).slice(0, 10),
     });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch dashboard data' }, { status: 500 });
