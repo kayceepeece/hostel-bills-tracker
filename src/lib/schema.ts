@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, date, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, date, timestamp, boolean } from 'drizzle-orm/pg-core';
 
 export const members = pgTable('members', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -51,4 +51,11 @@ export const electricityUsage = pgTable('electricity_usage', {
   remaining: integer('remaining').notNull(),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const siteSettings = pgTable('site_settings', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  key: text('key').notNull().unique(),
+  value: text('value').notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

@@ -4,10 +4,18 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 
+interface Settings {
+  light_bill_show_expected: string;
+  light_bill_expected_amount: string;
+}
+
 export default function Admin() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsSaved, setSettingsSaved] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,6 +35,35 @@ export default function Admin() {
       }
     } catch (err) {
       setError('Login failed');
+    }
+  };
+
+  // Load settings when logged in
+  useEffect(() => {
+    if (isLoggedIn && !settings) {
+      fetch('/api/settings')
+        .then(res => res.json())
+        .then(setSettings)
+        .catch(console.error);
+    }
+  }, [isLoggedIn, settings]);
+
+  const saveSettings = async () => {
+    if (!settings) return;
+    setSettingsLoading(true);
+    setSettingsSaved(false);
+    try {
+      await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
+      setSettingsSaved(true);
+      setTimeout(() => setSettingsSaved(false), 2000);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSettingsLoading(false);
     }
   };
 
@@ -179,6 +216,66 @@ export default function Admin() {
             </CardContent>
           </Card>
         </Link>
+
+        {/* Dashboard Settings */}
+        <Card>
+          <CardContent className="p-4">
+            <h2 className="font-semibold text-gray-900 mb-4">Dashboard Settings</h2>
+            
+            {settings ? (
+              <div className="space-y-4">
+                {/* Light Bill - Show Expected */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Show "Expected" on Light Bill</p>
+                    <p className="text-xs text-gray-500">Display expected amount and progress bar</p>
+                  </div>
+                  <button
+                    onClick={() => setSettings({
+                      ...settings,
+                      light_bill_show_expected: settings.light_bill_show_expected === 'true' ? 'false' : 'true',
+                    })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      settings.light_bill_show_expected === 'true' ? 'bg-emerald-500' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      settings.light_bill_show_expected === 'true' ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+
+                {/* Light Bill - Expected Amount */}
+                {settings.light_bill_show_expected === 'true' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-1">Expected Amount (₦)</label>
+                    <input
+                      type="number"
+                      value={settings.light_bill_expected_amount}
+                      onChange={(e) => setSettings({
+                        ...settings,
+                        light_bill_expected_amount: e.target.value,
+                      })}
+                      className="w-full bg-gray-50 border border-gray-200 text-gray-900 px-4 py-2.5 rounded-lg text-sm"
+                      placeholder="e.g. 130000"
+                    />
+                  </div>
+                )}
+
+                {/* Save Button */}
+                <button
+                  onClick={saveSettings}
+                  disabled={settingsLoading}
+                  className="w-full bg-gray-900 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50"
+                >
+                  {settingsLoading ? 'Saving...' : settingsSaved ? '✓ Saved!' : 'Save Settings'}
+                </button>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">Loading settings...</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Bottom Navigation */}

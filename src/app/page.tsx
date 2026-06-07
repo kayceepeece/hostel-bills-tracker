@@ -6,6 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface DashboardData {
   period: string;
+  settings: {
+    lightBillShowExpected: boolean;
+    lightBillExpectedAmount: number;
+  };
   summary: {
     lightBill: {
       collected: number;
@@ -94,18 +98,24 @@ export default function Dashboard() {
                   <p className="text-xs text-gray-500 uppercase tracking-wide">Collected</p>
                   <p className="text-2xl font-bold text-gray-900">{formatAmount(data.summary.lightBill.collected)}</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Expected</p>
-                  <p className="text-lg text-gray-600">{formatAmount(data.summary.lightBill.expected)}</p>
-                </div>
+                {data.settings.lightBillShowExpected && (
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Expected</p>
+                    <p className="text-lg text-gray-600">{formatAmount(data.summary.lightBill.expected)}</p>
+                  </div>
+                )}
               </div>
-              <div className="bg-gray-100 rounded-full h-2 overflow-hidden">
-                <div
-                  className="bg-emerald-500 h-full rounded-full transition-all"
-                  style={{ width: `${data.summary.lightBill.percentPaid}%` }}
-                />
-              </div>
-              <p className="text-xs text-gray-500 mt-2">{data.summary.lightBill.percentPaid}% paid</p>
+              {data.settings.lightBillShowExpected && (
+                <>
+                  <div className="bg-gray-100 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-emerald-500 h-full rounded-full transition-all"
+                      style={{ width: `${data.summary.lightBill.percentPaid}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">{data.summary.lightBill.percentPaid}% paid</p>
+                </>
+              )}
             </CardContent>
           </Card>
         </Link>

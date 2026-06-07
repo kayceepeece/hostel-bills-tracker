@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { members, lightBillPayments, sweepingPayments, environmentalPayments, electricityUsage } from '@/lib/schema';
+import { members, lightBillPayments, sweepingPayments, environmentalPayments, electricityUsage, siteSettings } from '@/lib/schema';
 import { eq, sql } from 'drizzle-orm';
 
 export async function GET(request: Request) {
@@ -8,6 +8,16 @@ export async function GET(request: Request) {
   const period = searchParams.get('period') || new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   try {
+    // Get settings
+    const settingsRows = await db.select().from(siteSettings);
+    const settings: Record<string, string> = {};
+    for (const row of settingsRows) {
+      settings[row.key] = row.value;
+    }
+
+    const showExpected = settings.light_bill_show_expected === 'true';
+    const expectedAmount = parseInt(settings.light_bill_expected_amount || '0', 10);
+
     // Get all members
     const allMembers = await db.select().from(members);
 
@@ -27,11 +37,7 @@ export async function GET(request: Request) {
       .where(sql`EXTRACT(MONTH FROM date) = ${monthNum} AND EXTRACT(YEAR FROM date) = ${yearNum}`);
 
     // Calculate summaries
-    const totalIndividuals = allMembers.filter(m => m.type === 'individual').length;
-    const totalShops = allMembers.filter(m => m.type === 'shop').length;
-    
     const lightBillCollected = lightBill.reduce((sum, p) => sum + p.amount, 0);
-    const lightBillExpected = totalIndividuals * 5000 + totalShops * 5000; // Example: 5000 per person
     
     const sweepingPayers = sweeping.filter(p => p.amount && p.amount > 0);
     const sweepers = allMembers.filter(m => m.sweepingRole === 'sweep');
@@ -45,11 +51,15 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       period,
+      settings: {
+        lightBillShowExpected: showExpected,
+        lightBillExpectedAmount: expectedAmount,
+      },
       summary: {
         lightBill: {
           collected: lightBillCollected,
-          expected: lightBillExpected,
-          percentPaid: lightBillExpected > 0 ? Math.round((lightBillCollected / lightBillExpected) * 100) : 0,
+          expected: showExpected ? expectedAmount : 0,
+          percentPaid: showExpected && expectedAmount > 0 ? Math.round((lightBillCollected / expectedAmount) * 100) : 0,
         },
         sweeping: {
           collected: sweepingCollected,
