@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
-import BottomNav from '@/components/bottom-nav';
 
 export default function Admin() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -33,7 +32,7 @@ export default function Admin() {
 
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-gray-50 pb-24">
+      <div className="min-h-screen bg-gray-50 ">
         <div className="flex items-center justify-center p-4 pt-20">
           <Card className="w-full max-w-md">
             <CardContent className="p-6">
@@ -70,13 +69,12 @@ export default function Admin() {
             </CardContent>
           </Card>
         </div>
-        <BottomNav />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="min-h-screen bg-gray-50 ">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="px-4 py-4 flex justify-between items-center">
@@ -184,7 +182,6 @@ export default function Admin() {
       </div>
 
       {/* Bottom Navigation */}
-      <BottomNav />
     </div>
   );
 }
