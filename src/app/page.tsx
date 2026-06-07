@@ -1,65 +1,200 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+
+interface DashboardData {
+  period: string;
+  summary: {
+    lightBill: {
+      collected: number;
+      expected: number;
+      percentPaid: number;
+    };
+    sweeping: {
+      collected: number;
+      payers: number;
+      sweepers: number;
+      share: number;
+    };
+    environmental: {
+      collected: number;
+      paid: number;
+      total: number;
+    };
+    electricity: {
+      unitsUsed: number;
+      cost: number;
+      avgDaily: number;
+    };
+  };
+  recentPayments: any[];
+}
+
+export default function Dashboard() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [period, setPeriod] = useState(() => {
+    const now = new Date();
+    return now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  });
+
+  useEffect(() => {
+    fetch(`/api/dashboard?period=${encodeURIComponent(period)}`)
+      .then(res => res.json())
+      .then(setData)
+      .catch(console.error);
+  }, [period]);
+
+  const formatAmount = (amount: number) => `₦${amount.toLocaleString()}`;
+
+  if (!data) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-400">Loading...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen pb-20">
+      {/* Month Selector */}
+      <div className="sticky top-0 z-10 bg-gray-900 p-4 border-b border-gray-800">
+        <select
+          value={period}
+          onChange={(e) => setPeriod(e.target.value)}
+          className="w-full bg-gray-800 text-white px-4 py-3 rounded-xl text-lg font-medium"
+        >
+          {Array.from({ length: 12 }, (_, i) => {
+            const date = new Date();
+            date.setMonth(date.getMonth() - i);
+            return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+          }).map(p => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="p-4 space-y-4">
+        {/* Light Bill */}
+        <Link href="/payments?tab=light" className="block">
+          <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-2xl">💡</span>
+              <h2 className="text-lg font-semibold">Light Bill</h2>
+            </div>
+            <div className="flex justify-between items-end mb-3">
+              <div>
+                <p className="text-gray-400 text-sm">Collected</p>
+                <p className="text-2xl font-bold">{formatAmount(data.summary.lightBill.collected)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-gray-400 text-sm">Expected</p>
+                <p className="text-lg">{formatAmount(data.summary.lightBill.expected)}</p>
+              </div>
+            </div>
+            <div className="bg-gray-700 rounded-full h-3 overflow-hidden">
+              <div
+                className="bg-green-500 h-full rounded-full transition-all"
+                style={{ width: `${data.summary.lightBill.percentPaid}%` }}
+              />
+            </div>
+            <p className="text-right text-sm text-gray-400 mt-1">{data.summary.lightBill.percentPaid}% paid</p>
+          </div>
+        </Link>
+
+        {/* Sweeping */}
+        <Link href="/payments?tab=sweeping" className="block">
+          <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-2xl">🧹</span>
+              <h2 className="text-lg font-semibold">Sweeping</h2>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-gray-400 text-sm">Collected</p>
+                <p className="text-2xl font-bold">{formatAmount(data.summary.sweeping.collected)}</p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-sm">Share/Sweeper</p>
+                <p className="text-2xl font-bold">{formatAmount(data.summary.sweeping.share)}</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-400 mt-3">
+              {data.summary.sweeping.payers} pay • {data.summary.sweeping.sweepers} sweep
+            </p>
+          </div>
+        </Link>
+
+        {/* Environmental */}
+        <Link href="/payments?tab=environmental" className="block">
+          <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-2xl">🌍</span>
+              <h2 className="text-lg font-semibold">Environmental Bill</h2>
+            </div>
+            <div className="flex justify-between items-end">
+              <div>
+                <p className="text-gray-400 text-sm">Collected</p>
+                <p className="text-2xl font-bold">{formatAmount(data.summary.environmental.collected)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-gray-400 text-sm">Paid</p>
+                <p className="text-lg">{data.summary.environmental.paid}/{data.summary.environmental.total}</p>
+              </div>
+            </div>
+          </div>
+        </Link>
+
+        {/* Electricity */}
+        <Link href="/electricity" className="block">
+          <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-2xl">⚡</span>
+              <h2 className="text-lg font-semibold">Electricity Usage</h2>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-gray-400 text-sm">Units Used</p>
+                <p className="text-2xl font-bold">{data.summary.electricity.unitsUsed}</p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-sm">Cost</p>
+                <p className="text-2xl font-bold">{formatAmount(data.summary.electricity.cost)}</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-400 mt-3">
+              Avg: {data.summary.electricity.avgDaily} units/day
+            </p>
+          </div>
+        </Link>
+      </div>
+
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 px-4 py-2">
+        <div className="flex justify-around">
+          <Link href="/" className="flex flex-col items-center py-2 text-white">
+            <span className="text-xl">🏠</span>
+            <span className="text-xs mt-1">Home</span>
+          </Link>
+          <Link href="/members" className="flex flex-col items-center py-2 text-gray-400">
+            <span className="text-xl">👥</span>
+            <span className="text-xs mt-1">Members</span>
+          </Link>
+          <Link href="/payments" className="flex flex-col items-center py-2 text-gray-400">
+            <span className="text-xl">💰</span>
+            <span className="text-xs mt-1">Payments</span>
+          </Link>
+          <Link href="/electricity" className="flex flex-col items-center py-2 text-gray-400">
+            <span className="text-xl">⚡</span>
+            <span className="text-xs mt-1">Electric</span>
+          </Link>
+          <Link href="/admin" className="flex flex-col items-center py-2 text-gray-400">
+            <span className="text-xl">🔧</span>
+            <span className="text-xs mt-1">Admin</span>
+          </Link>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </nav>
     </div>
   );
 }
