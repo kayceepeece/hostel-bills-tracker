@@ -28,9 +28,12 @@ interface DashboardData {
       total: number;
     };
     electricity: {
-      unitsUsed: number;
-      cost: number;
-      avgDaily: number;
+      currentRemaining: number;
+      consumptionRate: number;
+      estimatedDaysLeft: number | null;
+      costPerDay: number;
+      recentTopups: number;
+      totalTopupUnits: number;
     };
   };
 }
@@ -177,23 +180,33 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <span className="text-yellow-500">⚡</span>
-                Electricity Usage
+                Electricity
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4 mb-2">
+              <div className="flex justify-between items-end mb-2">
                 <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Units Used</p>
-                  <p className="text-2xl font-bold text-gray-900">{data.summary.electricity.unitsUsed}</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">Remaining</p>
+                  <p className="text-2xl font-bold text-gray-900">{data.summary.electricity.currentRemaining} kWh</p>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Cost</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatAmount(data.summary.electricity.cost)}</p>
+                <div className="text-right">
+                  {data.summary.electricity.estimatedDaysLeft !== null ? (
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      data.summary.electricity.estimatedDaysLeft < 3 ? 'bg-red-50 text-red-700' :
+                      data.summary.electricity.estimatedDaysLeft < 7 ? 'bg-amber-50 text-amber-700' :
+                      'bg-emerald-50 text-emerald-700'
+                    }`}>
+                      ~{data.summary.electricity.estimatedDaysLeft} days left
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-500">No data</span>
+                  )}
                 </div>
               </div>
-              <p className="text-sm text-gray-500">
-                Avg: {data.summary.electricity.avgDaily} units/day
-              </p>
+              <div className="flex justify-between text-sm text-gray-500">
+                <span>{data.summary.electricity.consumptionRate} kWh/day</span>
+                <span>₦{data.summary.electricity.costPerDay}/day</span>
+              </div>
             </CardContent>
           </Card>
         </Link>

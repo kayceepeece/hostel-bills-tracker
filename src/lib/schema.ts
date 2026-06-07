@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, date, timestamp, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, real, date, timestamp, boolean } from 'drizzle-orm/pg-core';
 
 export const members = pgTable('members', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -42,6 +42,29 @@ export const environmentalPayments = pgTable('environmental_payments', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+// Electricity: Top-ups (when you buy units)
+export const electricityTopups = pgTable('electricity_topups', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  amountNaira: integer('amount_naira').notNull(),
+  unitsKwh: real('units_kwh').notNull(),
+  rateUsed: real('rate_used').notNull(),
+  recordedAt: timestamp('recorded_at').defaultNow().notNull(),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Electricity: Meter observations (two independent screens)
+export const electricityReadings = pgTable('electricity_readings', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  meterReading: real('meter_reading'),          // screen 1: cumulative kWh
+  readingTime: timestamp('reading_time'),        // when screen 1 was observed
+  unitsRemaining: real('units_remaining'),       // screen 2: kWh remaining
+  remainingTime: timestamp('remaining_time'),    // when screen 2 was observed
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Keep old table reference for migration compatibility
 export const electricityUsage = pgTable('electricity_usage', {
   id: uuid('id').defaultRandom().primaryKey(),
   date: date('date').notNull(),

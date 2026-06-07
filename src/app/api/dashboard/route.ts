@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { members, lightBillPayments, sweepingPayments, environmentalPayments, electricityUsage, siteSettings } from '@/lib/schema';
+import { members, lightBillPayments, sweepingPayments, environmentalPayments, electricityReadings, electricityTopups, siteSettings } from '@/lib/schema';
 import { eq, sql } from 'drizzle-orm';
 
 export async function GET(request: Request) {
@@ -17,6 +17,7 @@ export async function GET(request: Request) {
 
     const showExpected = settings.light_bill_show_expected === 'true';
     const expectedAmount = parseInt(settings.light_bill_expected_amount || '0', 10);
+    const electricityRate = parseFloat(settings.electricity_rate || '73.5');
 
     // Get all members
     const allMembers = await db.select().from(members);
@@ -30,11 +31,40 @@ export async function GET(request: Request) {
     // Get environmental payments for period
     const environmental = await db.select().from(environmentalPayments).where(eq(environmentalPayments.period, period));
 
-    // Get electricity usage for the month
-    const monthNum = new Date(period + ' 1').getMonth() + 1;
-    const yearNum = new Date(period + ' 1').getFullYear();
-    const electricity = await db.select().from(electricityUsage)
-      .where(sql`EXTRACT(MONTH FROM date) = ${monthNum} AND EXTRACT(YEAR FROM date) = ${yearNum}`);
+    // Get latest electricity reading for dashboard
+    const latestReading = await db.select().from(electricityReadings)
+      .where(sql`${electricityReadings.unitsRemaining} IS NOT NULL`)
+      .orderBy(sql`${electricityReadings.remainingTime} DESC`)
+      .limit(1);
+
+    // Get recent top-ups
+    const recentTopups = await db.select().from(electricityTopups)
+      .where(sql`${electricityTopups.recordedAt} >= NOW() - INTERVAL '30 days'`);
+
+    // Get paired readings for consumption calculation
+    const pairedReadings = await db.select().from(electricityReadings)
+      .where(sql`${electricityReadings.meterReading} IS NOT NULL AND ${electricityReadings.unitsRemaining} IS NOT NULL`)
+      .orderBy(sql`${electricityReadings.readingTime} ASC`);
+
+    // Calculate electricity summary
+    let consumptionRate = 0;
+    let estimatedDaysLeft: number | null = null;
+    if (pairedReadings.length >= 2) {
+      const latest = pairedReadings[pairedReadings.length - 1];
+      const previous = pairedReadings[pairedReadings.length - 2];
+      const kwhUsed = (previous.unitsRemaining || 0) - (latest.unitsRemaining || 0);
+      const timeDiffMs = new Date(latest.readingTime || latest.createdAt).getTime() - new Date(previous.readingTime || previous.createdAt).getTime();
+      const timeDiffDays = timeDiffMs / (1000 * 60 * 60 * 24);
+      if (timeDiffDays > 0 && kwhUsed > 0) {
+        consumptionRate = Math.round((kwhUsed / timeDiffDays) * 100) / 100;
+        const currentRemaining = latestReading.length > 0 ? latestReading[0].unitsRemaining : 0;
+        if (currentRemaining && consumptionRate > 0) {
+          estimatedDaysLeft = Math.round((currentRemaining / consumptionRate) * 10) / 10;
+        }
+      }
+    }
+
+    const currentRemaining = latestReading.length > 0 ? latestReading[0].unitsRemaining : 0;
 
     // Calculate summaries
     const lightBillCollected = lightBill.reduce((sum, p) => sum + p.amount, 0);
@@ -45,9 +75,6 @@ export async function GET(request: Request) {
     const sweepingShare = sweepers.length > 0 ? Math.round(sweepingCollected / sweepers.length) : 0;
     
     const environmentalCollected = environmental.reduce((sum, p) => sum + p.amount, 0);
-    
-    const electricityUnitsUsed = electricity.reduce((sum, e) => sum + e.unitsUsed, 0);
-    const electricityCost = electricity.reduce((sum, e) => sum + e.bought, 0);
 
     return NextResponse.json({
       period,
@@ -73,9 +100,12 @@ export async function GET(request: Request) {
           total: allMembers.length,
         },
         electricity: {
-          unitsUsed: electricityUnitsUsed,
-          cost: electricityCost,
-          avgDaily: electricity.length > 0 ? Math.round(electricityUnitsUsed / electricity.length) : 0,
+          currentRemaining: currentRemaining || 0,
+          consumptionRate,
+          estimatedDaysLeft,
+          costPerDay: Math.round(consumptionRate * electricityRate),
+          recentTopups: recentTopups.length,
+          totalTopupUnits: Math.round(recentTopups.reduce((sum, t) => sum + t.unitsKwh, 0) * 100) / 100,
         },
       },
       recentPayments: [

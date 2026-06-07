@@ -8,6 +8,7 @@ import AdminGuard from '@/components/admin-guard';
 interface Settings {
   light_bill_show_expected: string;
   light_bill_expected_amount: string;
+  electricity_rate: string;
 }
 
 function AdminContent() {
@@ -175,6 +176,23 @@ function AdminContent() {
                   />
                 </div>
               )}
+
+              {/* Electricity Rate */}
+              <div className="border-t border-gray-200 pt-4 mt-4">
+                <label className="block text-sm font-medium text-gray-900 mb-1">Electricity Rate (₦/kWh)</label>
+                <p className="text-xs text-gray-500 mb-2">Rate used to convert ₦ top-ups to kWh</p>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={settings.electricity_rate || '73.5'}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    electricity_rate: e.target.value,
+                  })}
+                  className="w-full bg-gray-50 border border-gray-200 text-gray-900 px-4 py-2.5 rounded-lg text-sm"
+                  placeholder="e.g. 73.5"
+                />
+              </div>
 
               <button
                 onClick={saveSettings}
