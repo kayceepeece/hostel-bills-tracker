@@ -56,18 +56,21 @@ export async function GET(request: Request) {
     // Balance method (if load data is insufficient)
     if (consumptionRate === 0 && topups.length > 0 && currentRemaining > 0) {
       const totalTopup = topups.reduce((s, t) => s + t.value, 0);
-      const daysSinceFirst = Math.max(1, (now - new Date(topups[0].recordedAt).getTime()) / 86400000);
+      const daysSinceFirst = Math.max(0.5, (now - new Date(topups[0].recordedAt).getTime()) / 86400000);
       const consumed = totalTopup - currentRemaining;
       if (consumed > 0) consumptionRate = Math.round((consumed / daysSinceFirst) * 100) / 100;
     }
 
-    // Meter reading difference (most accurate if available)
+    // Meter reading difference (if enough time between readings)
     if (readings.length >= 2) {
       const first = readings[0];
       const last = readings[readings.length - 1];
       const diff = last.value - first.value;
-      const days = Math.max(1, (new Date(last.recordedAt).getTime() - new Date(first.recordedAt).getTime()) / 86400000);
-      consumptionRate = Math.round((diff / days) * 100) / 100;
+      const hoursBetween = (new Date(last.recordedAt).getTime() - new Date(first.recordedAt).getTime()) / 3600000;
+      const daysBetween = Math.max(0.1, hoursBetween / 24); // at least 0.1 day = 2.4h minimum
+      if (diff >= 0 && hoursBetween > 0) {
+        consumptionRate = Math.round((diff / daysBetween) * 100) / 100;
+      }
     }
 
     if (currentRemaining > 0 && consumptionRate > 0) {
