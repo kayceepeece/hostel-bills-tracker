@@ -16,7 +16,7 @@ interface Observation {
 const TYPE_CONFIG = {
   meter_reading: { icon: '🔢', label: 'Meter Reading', unit: 'kWh (cumulative)', color: 'bg-blue-50 text-blue-700' },
   units_remaining: { icon: '⛽', label: 'Units Remaining', unit: 'kWh', color: 'bg-emerald-50 text-emerald-700' },
-  current_load: { icon: '⚡', label: 'Current Load', unit: 'W or kW', color: 'bg-amber-50 text-amber-700' },
+  current_load: { icon: '⚡', label: 'Current Load', unit: 'kW', color: 'bg-amber-50 text-amber-700' },
   topup: { icon: '💰', label: 'Top-Up', unit: '₦', color: 'bg-purple-50 text-purple-700' },
 };
 

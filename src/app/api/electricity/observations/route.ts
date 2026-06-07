@@ -9,7 +9,7 @@ type ObservationType = typeof VALID_TYPES[number];
 const TYPE_LABELS: Record<ObservationType, string> = {
   meter_reading: 'Meter Reading (cumulative kWh)',
   units_remaining: 'Units Remaining (kWh)',
-  current_load: 'Current Load (W or kW)',
+  current_load: 'Current Load (kW)',
   topup: 'Top-Up (₦ → kWh)',
 };
 
