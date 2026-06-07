@@ -8,11 +8,9 @@ export async function GET(request: Request) {
   const period = searchParams.get('period');
 
   try {
-    let query = db.select().from(environmentalPayments);
-    if (period) {
-      query = query.where(eq(environmentalPayments.period, period));
-    }
-    const payments = await query;
+    const payments = period
+      ? await db.select().from(environmentalPayments).where(eq(environmentalPayments.period, period))
+      : await db.select().from(environmentalPayments);
     return NextResponse.json(payments);
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch environmental payments' }, { status: 500 });

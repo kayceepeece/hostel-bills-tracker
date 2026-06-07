@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { electricityUsage } from '@/lib/schema';
-import { eq, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -9,11 +9,10 @@ export async function GET(request: Request) {
   const year = searchParams.get('year');
 
   try {
-    let query = db.select().from(electricityUsage);
-    if (month && year) {
-      query = query.where(sql`EXTRACT(MONTH FROM date) = ${month} AND EXTRACT(YEAR FROM date) = ${year}`);
-    }
-    const readings = await query;
+    const readings = (month && year)
+      ? await db.select().from(electricityUsage)
+          .where(sql`EXTRACT(MONTH FROM date) = ${month} AND EXTRACT(YEAR FROM date) = ${year}`)
+      : await db.select().from(electricityUsage);
     return NextResponse.json(readings);
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch electricity usage' }, { status: 500 });
