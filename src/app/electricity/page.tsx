@@ -190,6 +190,8 @@ export default function ElectricityPage() {
               <div className="space-y-2">
                 {summary.methods.map(m => {
                   const isPrimary = m === summary.primary;
+                  const remainingKwh = summary?.readings?.remaining?.value ?? 0;
+                  const daysLeft = m.kwhPerDay > 0 ? Math.round((remainingKwh / m.kwhPerDay) * 10) / 10 : null;
                   return (
                     <div
                       key={m.method}
@@ -202,9 +204,20 @@ export default function ElectricityPage() {
                           </span>
                           {isPrimary && <span className="text-[10px] text-emerald-600 font-medium">✓ used</span>}
                         </div>
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${CONFIDENCE_STYLES[m.confidence]}`}>
-                          {m.confidence}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {daysLeft !== null && (
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                              daysLeft < 3 ? 'bg-red-50 text-red-700' :
+                              daysLeft < 7 ? 'bg-amber-50 text-amber-700' :
+                              'bg-emerald-50 text-emerald-700'
+                            }`}>
+                              ~{daysLeft}d left
+                            </span>
+                          )}
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${CONFIDENCE_STYLES[m.confidence]}`}>
+                            {m.confidence}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex gap-3">
                         <span className="text-sm font-bold text-gray-900">{m.kwhPerDay} kWh/day</span>
