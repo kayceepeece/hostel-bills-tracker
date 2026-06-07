@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 const DEFAULTS: Record<string, string> = {
   light_bill_show_expected: 'false',
   light_bill_expected_amount: '0',
+  light_bill_default_amount: '0',
   electricity_rate: '73.5',
 };
 

@@ -17,6 +17,7 @@ export async function GET(request: Request) {
 
     const showExpected = settings.light_bill_show_expected === 'true';
     const expectedAmount = parseInt(settings.light_bill_expected_amount || '0', 10);
+    const defaultLightAmount = parseInt(settings.light_bill_default_amount || '0', 10);
     const electricityRate = parseFloat(settings.electricity_rate || '73.5');
 
     // Get all members
@@ -68,7 +69,7 @@ export async function GET(request: Request) {
 
     // Calculate summaries
     const lightBillCollected = lightBill.reduce((sum, p) => sum + p.amount, 0);
-    
+    const lightBillExpected = allMembers.reduce((sum, m) => sum + (m.lightBillAmount || defaultLightAmount), 0);
     const sweepingPayers = sweeping.filter(p => p.amount && p.amount > 0);
     const sweepers = allMembers.filter(m => m.sweepingRole === 'sweep');
     const sweepingCollected = sweepingPayers.reduce((sum, p) => sum + (p.amount || 0), 0);

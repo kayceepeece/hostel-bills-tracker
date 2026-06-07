@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import AdminGuard from '@/components/admin-guard';
 
@@ -92,25 +93,27 @@ function MembersContent() {
       {/* Members List */}
       <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">All Members ({members.length})</h3>
       {members.map(m => (
-        <Card key={m.id}>
-          <CardContent className="p-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-semibold text-gray-900">{m.name}</h3>
-                <p className="text-sm text-gray-500">{m.room} • {m.type === 'individual' ? 'Individual' : 'Shop'}</p>
-                {m.sweepingRole && (
-                  <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${m.sweepingRole === 'pay' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
-                    {m.sweepingRole === 'pay' ? '💰 Pay' : '🧹 Sweep'}
-                  </span>
-                )}
+        <Link key={m.id} href={`/admin/members/${m.id}`}>
+          <Card className="hover:shadow-md transition-shadow cursor-pointer">
+            <CardContent className="p-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-semibold text-gray-900">{m.name}</h3>
+                  <p className="text-sm text-gray-500">{m.room} • {m.type === 'individual' ? 'Individual' : 'Shop'}</p>
+                  {m.sweepingRole && (
+                    <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${m.sweepingRole === 'pay' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
+                      {m.sweepingRole === 'pay' ? '💰 Pay' : '🧹 Sweep'}
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={(e) => { e.preventDefault(); handleEdit(m); }} className="text-sm text-blue-600 hover:text-blue-800">Edit</button>
+                  <button onClick={(e) => { e.preventDefault(); handleDelete(m.id); }} className="text-sm text-red-600 hover:text-red-800">Delete</button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button onClick={() => handleEdit(m)} className="text-sm text-blue-600 hover:text-blue-800">Edit</button>
-                <button onClick={() => handleDelete(m.id)} className="text-sm text-red-600 hover:text-red-800">Delete</button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
       ))}
     </div>
   );

@@ -8,6 +8,7 @@ import AdminGuard from '@/components/admin-guard';
 interface Settings {
   light_bill_show_expected: string;
   light_bill_expected_amount: string;
+  light_bill_default_amount: string;
   electricity_rate: string;
 }
 
@@ -160,21 +161,37 @@ function AdminContent() {
                   }`} />
                 </button>
               </div>
-
+              {/* Light Bill - Expected Amount */}
               {settings.light_bill_show_expected === 'true' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-1">Expected Amount (₦)</label>
-                  <input
-                    type="number"
-                    value={settings.light_bill_expected_amount}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      light_bill_expected_amount: e.target.value,
-                    })}
-                    className="w-full bg-gray-50 border border-gray-200 text-gray-900 px-4 py-2.5 rounded-lg text-sm"
-                    placeholder="e.g. 130000"
-                  />
-                </div>
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-1">Expected Amount (₦)</label>
+                    <input
+                      type="number"
+                      value={settings.light_bill_expected_amount}
+                      onChange={(e) => setSettings({
+                        ...settings,
+                        light_bill_expected_amount: e.target.value,
+                      })}
+                      className="w-full bg-gray-50 border border-gray-200 text-gray-900 px-4 py-2.5 rounded-lg text-sm"
+                      placeholder="e.g. 130000"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-1">Default Per-Member Amount (₦)</label>
+                    <p className="text-xs text-gray-500 mb-1">Used when a member has no individual amount set in their profile</p>
+                    <input
+                      type="number"
+                      value={settings.light_bill_default_amount}
+                      onChange={(e) => setSettings({
+                        ...settings,
+                        light_bill_default_amount: e.target.value,
+                      })}
+                      className="w-full bg-gray-50 border border-gray-200 text-gray-900 px-4 py-2.5 rounded-lg text-sm"
+                      placeholder="e.g. 5000"
+                    />
+                  </div>
+                </>
               )}
 
               {/* Electricity Rate */}

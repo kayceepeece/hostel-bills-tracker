@@ -6,8 +6,10 @@ export const members = pgTable('members', {
   room: text('room').notNull(),
   type: text('type', { enum: ['individual', 'shop'] }).notNull(),
   sweepingRole: text('sweeping_role', { enum: ['pay', 'sweep'] }),
+  lightBillAmount: integer('light_bill_amount'),   // per-member override (NULL = use default)
   phone: text('phone'),
   altContact: text('alt_contact'),
+  notes: text('notes'),                             // admin-only notes
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

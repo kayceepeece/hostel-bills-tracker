@@ -54,7 +54,8 @@ export default function Members() {
       {/* Member List */}
       <div className="p-4 space-y-3">
         {filteredMembers.map(member => (
-          <Card key={member.id}>
+          <Link key={member.id} href={`/members/${member.id}`}>
+          <Card className="hover:shadow-md transition-shadow cursor-pointer">
             <CardContent className="p-4">
               <div className="flex justify-between items-start">
                 <div>
@@ -78,6 +79,7 @@ export default function Members() {
               )}
             </CardContent>
           </Card>
+          </Link>
         ))}
       </div>
     </div>

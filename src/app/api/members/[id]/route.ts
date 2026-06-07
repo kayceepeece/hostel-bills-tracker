@@ -12,8 +12,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       room: body.room,
       type: body.type,
       sweepingRole: body.sweepingRole || null,
+      lightBillAmount: body.lightBillAmount !== undefined ? body.lightBillAmount : null,
       phone: body.phone || null,
       altContact: body.altContact || null,
+      notes: body.notes || null,
     }).where(eq(members.id, id));
     return NextResponse.json({ ok: true });
   } catch (error) {
