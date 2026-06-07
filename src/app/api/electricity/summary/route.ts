@@ -3,11 +3,14 @@ import { db } from '@/lib/db';
 import { electricityObservations, siteSettings } from '@/lib/schema';
 import { sql, eq, asc } from 'drizzle-orm';
 
-interface CalcResult {
+/** Each method returns its own estimate + a confidence indicator */
+interface MethodResult {
   kwhPerDay: number;
   costPerDay: number;
-  method: 'load' | 'balance' | 'meter' | 'topup_only';
+  method: 'load_avg' | 'load_latest' | 'balance' | 'meter';
   label: string;
+  confidence: 'high' | 'medium' | 'low' | 'insufficient_data';
+  reason: string;
 }
 
 export async function GET() {
@@ -15,133 +18,176 @@ export async function GET() {
     const settingsRows = await db.select().from(siteSettings).where(eq(siteSettings.key, 'electricity_rate'));
     const rate = settingsRows.length > 0 ? parseFloat(settingsRows[0].value) : 73.5;
 
-    // ---- FETCH LATEST OF EACH OBSERVATION TYPE ----
-    const latestMeter = await db.select().from(electricityObservations)
-      .where(sql`${electricityObservations.type} = 'meter_reading'`)
-      .orderBy(sql`${electricityObservations.recordedAt} DESC`).limit(1);
+    // ---- FETCH ALL DATA AT ONCE ----
+    const allObs = await db.select()
+      .from(electricityObservations)
+      .orderBy(asc(electricityObservations.recordedAt));
 
-    const latestRemaining = await db.select().from(electricityObservations)
-      .where(sql`${electricityObservations.type} = 'units_remaining'`)
-      .orderBy(sql`${electricityObservations.recordedAt} DESC`).limit(1);
+    const getType = (type: string) => allObs.filter(o => o.type === type);
 
-    const latestLoad = await db.select().from(electricityObservations)
-      .where(sql`${electricityObservations.type} = 'current_load'`)
-      .orderBy(sql`${electricityObservations.recordedAt} DESC`).limit(1);
+    const topups = getType('topup');
+    const loads = getType('current_load');
+    const readings = getType('meter_reading');
+    const remainings = getType('units_remaining');
 
-    // ---- CALCULATE CONSUMPTION ----
-    let calc: CalcResult = { kwhPerDay: 0, costPerDay: 0, method: 'topup_only', label: 'Estimate' };
+    // Latest of each
+    const latestLoad = loads.length > 0 ? loads[loads.length - 1] : null;
+    const latestRemaining = remainings.length > 0 ? remainings[remainings.length - 1] : null;
+    const latestReading = readings.length > 0 ? readings[readings.length - 1] : null;
 
-    // Method 1: Current Load (instantaneous × 24h — most reliable short-term)
-    if (latestLoad.length > 0 && latestLoad[0].value > 0) {
-      const loadKw = latestLoad[0].value;
-      calc = {
-        kwhPerDay: Math.round(loadKw * 24 * 100) / 100,
-        costPerDay: Math.round(loadKw * 24 * rate),
-        method: 'load',
-        label: `⚡ ${loadKw} kW load × 24h`,
-      };
-    }
+    const now = Date.now();
 
-    // Method 2: Balance method (total topups minus remaining, ÷ days)
-    if (calc.method === 'topup_only') {
-      const allTopups = await db.select().from(electricityObservations)
-        .where(sql`${electricityObservations.type} = 'topup'`)
-        .orderBy(asc(electricityObservations.recordedAt));
+    // ---- CALCULATE ALL METHODS ----
+    const methods: MethodResult[] = [];
 
-      if (allTopups.length > 0) {
-        const totalTopupKwh = allTopups.reduce((s, t) => s + t.value, 0);
-        const firstTopupTime = new Date(allTopups[0].recordedAt).getTime();
-        const now = Date.now();
-        const daysSinceFirst = Math.max(1, (now - firstTopupTime) / (1000 * 60 * 60 * 24));
+    // ── Method A: Average Load × 24 ──
+    if (loads.length > 0) {
+      const avgLoad = loads.reduce((s, o) => s + o.value, 0) / loads.length;
+      const spanMs = now - new Date(loads[0].recordedAt).getTime();
+      const spanHours = spanMs / 3600000;
+      const kwhPerDay = Math.round(avgLoad * 24 * 100) / 100;
 
-        if (latestRemaining.length > 0) {
-          // Consumed = what was added minus what's left
-          const consumed = totalTopupKwh - latestRemaining[0].value;
-          if (consumed > 0) {
-            const kwhPerDay = Math.round((consumed / daysSinceFirst) * 100) / 100;
-            calc = {
-              kwhPerDay,
-              costPerDay: Math.round(kwhPerDay * rate),
-              method: 'balance',
-              label: `💰 ${totalTopupKwh.toFixed(1)} added − ${latestRemaining[0].value.toFixed(1)} left ÷ ${Math.round(daysSinceFirst)} days`,
-            };
-          }
-        }
-
-        // Fallback: just top-up average (no remaining data)
-        if (calc.method === 'topup_only') {
-          const kwhPerDay = Math.round((totalTopupKwh / daysSinceFirst) * 100) / 100;
-          calc = {
-            kwhPerDay,
-            costPerDay: Math.round(kwhPerDay * rate),
-            method: 'topup_only',
-            label: `💰 ~avg from ${allTopups.length} top-up(s)`,
-          };
-        }
+      let confidence: 'high' | 'medium' | 'low' = 'low';
+      let reason = '';
+      if (spanHours >= 20 && loads.length >= 10) {
+        confidence = 'high';
+        reason = `Average of ${loads.length} readings across ${spanHours.toFixed(0)}h`;
+      } else if (spanHours >= 4 && loads.length >= 4) {
+        confidence = 'medium';
+        reason = `Average of ${loads.length} readings across ${spanHours.toFixed(0)}h (more hours needed)`;
+      } else {
+        confidence = 'low';
+        reason = `Only ${loads.length} readings in ${spanHours.toFixed(1)}h — needs readings across a full day`;
       }
+
+      methods.push({
+        kwhPerDay,
+        costPerDay: Math.round(kwhPerDay * rate),
+        method: 'load_avg',
+        label: `Avg ${avgLoad.toFixed(2)} kW × 24h`,
+        confidence,
+        reason,
+      });
     }
 
-    // Method 3: Meter readings (reliable long-term, needs 2+ readings)
-    if (calc.method === 'topup_only') {
-      const meterReadings = await db.select().from(electricityObservations)
-        .where(sql`${electricityObservations.type} = 'meter_reading'`)
-        .orderBy(asc(electricityObservations.recordedAt));
+    // ── Method B: Latest Load × 24 (current snapshot) ──
+    if (latestLoad && latestLoad.value > 0) {
+      const kwhPerDay = Math.round(latestLoad.value * 24 * 100) / 100;
+      methods.push({
+        kwhPerDay,
+        costPerDay: Math.round(kwhPerDay * rate),
+        method: 'load_latest',
+        label: `Latest ${latestLoad.value} kW × 24h`,
+        confidence: 'low',
+        reason: 'Snapshot — assumes constant load. Unreliable if load varies.',
+      });
+    }
 
-      if (meterReadings.length >= 2) {
-        const latest = meterReadings[meterReadings.length - 1];
-        const previous = meterReadings[meterReadings.length - 2];
-        const unitsUsed = latest.value - previous.value;
-        const timeDiffDays = (new Date(latest.recordedAt).getTime() - new Date(previous.recordedAt).getTime()) / (1000 * 60 * 60 * 24);
-        if (timeDiffDays > 0 && unitsUsed >= 0) {
-          const kwhPerDay = Math.round((unitsUsed / timeDiffDays) * 100) / 100;
-          calc = {
-            kwhPerDay,
-            costPerDay: Math.round(kwhPerDay * rate),
-            method: 'meter',
-            label: `🔢 ${unitsUsed.toFixed(1)} kWh ÷ ${Math.round(timeDiffDays)} days`,
-          };
-        }
+    // ── Method C: Balance Method ──
+    // (Total kWh ever topped up) − (latest remaining) = total consumed
+    // Divide by days since first meaningful data point
+    const totalTopupKwh = topups.reduce((s, o) => s + o.value, 0);
+    if (topups.length > 0 && latestRemaining && totalTopupKwh > latestRemaining.value) {
+      const firstData = topups[0];
+      const daysSinceFirst = Math.max(1, (now - new Date(firstData.recordedAt).getTime()) / 86400000);
+      const consumed = totalTopupKwh - latestRemaining.value;
+      const kwhPerDay = Math.round((consumed / daysSinceFirst) * 100) / 100;
+
+      // Check how recent the last top-up is — balance is unreliable if it just happened
+      const hoursSinceLastTopup = (now - new Date(topups[topups.length - 1].recordedAt).getTime()) / 3600000;
+      const daysSinceLastRemaining = (now - new Date(latestRemaining.recordedAt).getTime()) / 86400000;
+
+      let confidence: 'high' | 'medium' | 'low' = 'medium';
+      let reason = '';
+      if (daysSinceFirst >= 7 && hoursSinceLastTopup >= 24) {
+        confidence = 'high';
+        reason = `Tracked over ${daysSinceFirst.toFixed(0)} days — reliable`;
+      } else if (daysSinceFirst >= 2 && hoursSinceLastTopup >= 6) {
+        confidence = 'medium';
+        reason = `${daysSinceFirst.toFixed(0)} days of data, ${hoursSinceLastTopup.toFixed(0)}h since last top-up`;
+      } else {
+        confidence = 'low';
+        reason = `Only ${daysSinceFirst.toFixed(1)} days — last top-up was ${hoursSinceLastTopup.toFixed(0)}h ago, need more settling time`;
       }
+
+      methods.push({
+        kwhPerDay,
+        costPerDay: Math.round(kwhPerDay * rate),
+        method: 'balance',
+        label: `${totalTopupKwh.toFixed(1)} added − ${latestRemaining.value.toFixed(1)} left ÷ ${daysSinceFirst.toFixed(1)}d`,
+        confidence,
+        reason,
+      });
     }
 
-    // ---- ESTIMATED DAYS LEFT ----
+    // ── Method D: Meter Reading Difference ──
+    if (readings.length >= 2) {
+      const first = readings[0];
+      const last = readings[readings.length - 1];
+      const diff = last.value - first.value;
+      const days = Math.max(1, (new Date(last.recordedAt).getTime() - new Date(first.recordedAt).getTime()) / 86400000);
+      const kwhPerDay = Math.round((diff / days) * 100) / 100;
+
+      methods.push({
+        kwhPerDay,
+        costPerDay: Math.round(kwhPerDay * rate),
+        method: 'meter',
+        label: `${diff.toFixed(1)} kWh ÷ ${days.toFixed(0)} days`,
+        confidence: 'high',
+        reason: `Direct meter reading difference — most accurate`,
+      });
+    }
+
+    // ---- DERIVED VALUES ----
+    // Pick the best method as primary
+    const confidenceRank = { high: 3, medium: 2, low: 1, insufficient_data: 0 };
+    const methodRank = { meter: 4, balance: 3, load_avg: 2, load_latest: 1 };
+    const primary = methods.length > 0
+      ? methods.sort((a, b) => {
+          const scoreA = (confidenceRank[a.confidence] || 0) * 10 + (methodRank[a.method] || 0);
+          const scoreB = (confidenceRank[b.confidence] || 0) * 10 + (methodRank[b.method] || 0);
+          return scoreB - scoreA;
+        })[0]
+      : null;
+
+    // Estimated days left from remaining
     let estimatedDaysLeft: number | null = null;
-    if (latestRemaining.length > 0 && calc.kwhPerDay > 0) {
-      estimatedDaysLeft = Math.round((latestRemaining[0].value / calc.kwhPerDay) * 10) / 10;
+    if (latestRemaining && primary && primary.kwhPerDay > 0) {
+      estimatedDaysLeft = Math.round((latestRemaining.value / primary.kwhPerDay) * 10) / 10;
     }
 
-    // ---- RECENT TOP-UPS ----
-    const recentTopups = await db.select().from(electricityObservations)
-      .where(sql`${electricityObservations.type} = 'topup' AND ${electricityObservations.recordedAt} >= NOW() - INTERVAL '30 days'`);
-    const totalTopupKwhRecent = recentTopups.reduce((s, t) => s + t.value, 0);
+    // Recent top-ups
+    const recentTopups = topups.filter(o => new Date(o.recordedAt).getTime() >= now - 30 * 86400000);
 
     return NextResponse.json({
       rate,
-      currentMeterReading: latestMeter.length > 0 ? latestMeter[0].value : null,
-      currentMeterTime: latestMeter.length > 0 ? latestMeter[0].recordedAt : null,
-      currentRemaining: latestRemaining.length > 0 ? latestRemaining[0].value : 0,
-      remainingTime: latestRemaining.length > 0 ? latestRemaining[0].recordedAt : null,
-      currentLoad: latestLoad.length > 0 ? latestLoad[0].value : null,
-      currentLoadTime: latestLoad.length > 0 ? latestLoad[0].recordedAt : null,
-      consumption: calc,
+      readings: {
+        meter: latestReading ? { value: latestReading.value, time: latestReading.recordedAt } : null,
+        remaining: latestRemaining ? { value: latestRemaining.value, time: latestRemaining.recordedAt } : null,
+        load: latestLoad ? { value: latestLoad.value, time: latestLoad.recordedAt } : null,
+      },
+      methods,
+      primary,
       estimatedDaysLeft,
+      dataAge: {
+        firstTopup: topups.length > 0 ? topups[0].recordedAt : null,
+        trackDays: topups.length > 0 ? Math.round((now - new Date(topups[0].recordedAt).getTime()) / 86400000 * 10) / 10 : 0,
+        loadSpan: loads.length > 0 ? Math.round((now - new Date(loads[0].recordedAt).getTime()) / 3600000 * 10) / 10 : 0,
+      },
       recentTopups: {
         count: recentTopups.length,
-        totalKwh: Math.round(totalTopupKwhRecent * 100) / 100,
+        totalKwh: Math.round(recentTopups.reduce((s, o) => s + o.value, 0) * 100) / 100,
       },
     });
   } catch (error) {
     console.error('Summary error:', error);
     return NextResponse.json({
       rate: 73.5,
-      currentMeterReading: null,
-      currentMeterTime: null,
-      currentRemaining: 0,
-      remainingTime: null,
-      currentLoad: null,
-      currentLoadTime: null,
-      consumption: { kwhPerDay: 0, costPerDay: 0, method: 'topup_only', label: 'No data yet' },
+      readings: { meter: null, remaining: null, load: null },
+      methods: [],
+      primary: null,
       estimatedDaysLeft: null,
+      dataAge: { firstTopup: null, trackDays: 0, loadSpan: 0 },
       recentTopups: { count: 0, totalKwh: 0 },
     });
   }
