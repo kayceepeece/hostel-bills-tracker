@@ -56,7 +56,7 @@ function LightBillContent() {
           <form onSubmit={handleSubmit} className="space-y-3">
             <select value={form.memberId} onChange={e => setForm({...form, memberId: e.target.value})} className="w-full bg-gray-50 border border-gray-200 text-gray-900 px-3 py-2 rounded-lg text-sm" required>
               <option value="">Select member</option>
-              {members.map(m => <option key={m.id} value={m.id}>{m.name} ({m.room})</option>)}
+              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
             <div className="grid grid-cols-2 gap-3">
               <input type="number" placeholder="Amount (₦)" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} className="bg-gray-50 border border-gray-200 text-gray-900 px-3 py-2 rounded-lg text-sm" required />

@@ -81,9 +81,12 @@ export async function GET(request: Request) {
     const lightBillCollected = lightBill.reduce((sum, p) => sum + p.amount, 0);
     const lightBillExpected = allMembers.reduce((sum, m) => sum + (m.lightBillAmount || defaultLightAmount), 0);
     const sweepingPayers = sweeping.filter(p => p.amount && p.amount > 0);
+    const allPayers = allMembers.filter(m => m.sweepingRole === 'pay');
     const sweepers = allMembers.filter(m => m.sweepingRole === 'sweep');
     const sweepingCollected = sweepingPayers.reduce((sum, p) => sum + (p.amount || 0), 0);
     const sweepingShare = sweepers.length > 0 ? Math.round(sweepingCollected / sweepers.length) : 0;
+    const sweepingExpected = allPayers.length * 1500;
+    const sweepingPercentPaid = sweepingExpected > 0 ? Math.round((sweepingCollected / sweepingExpected) * 100) : 0;
     
     const environmentalCollected = environmental.reduce((sum, p) => sum + p.amount, 0);
 
@@ -101,7 +104,10 @@ export async function GET(request: Request) {
         },
         sweeping: {
           collected: sweepingCollected,
+          expected: sweepingExpected,
+          percentPaid: sweepingPercentPaid,
           payers: sweepingPayers.length,
+          expectedPayers: allPayers.length,
           sweepers: sweepers.length,
           share: sweepingShare,
         },

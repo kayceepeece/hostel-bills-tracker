@@ -58,7 +58,7 @@ function SweepingContent() {
           <form onSubmit={handleSubmit} className="space-y-3">
             <select value={form.memberId} onChange={e => setForm({...form, memberId: e.target.value})} className="w-full bg-gray-50 border border-gray-200 text-gray-900 px-3 py-2 rounded-lg text-sm" required>
               <option value="">Select member (payers only)</option>
-              {payers.map(m => <option key={m.id} value={m.id}>{m.name} ({m.room})</option>)}
+              {payers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
             <input type="number" placeholder="Amount paid (₦) — leave empty if swept" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} className="w-full bg-gray-50 border border-gray-200 text-gray-900 px-3 py-2 rounded-lg text-sm" />
             <input placeholder="Notes (optional)" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} className="w-full bg-gray-50 border border-gray-200 text-gray-900 px-3 py-2 rounded-lg text-sm" />

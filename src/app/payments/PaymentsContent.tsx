@@ -45,7 +45,7 @@ export default function PaymentsContent() {
 
   const getMemberName = (memberId: string) => {
     const member = members.find(m => m.id === memberId);
-    return member ? `${member.name} (${member.room})` : 'Unknown';
+    return member ? member.name : 'Unknown';
   };
 
   const formatAmount = (amount: number) => `₦${amount.toLocaleString()}`;

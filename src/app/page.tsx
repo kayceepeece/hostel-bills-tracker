@@ -18,7 +18,10 @@ interface DashboardData {
     };
     sweeping: {
       collected: number;
+      expected: number;
+      percentPaid: number;
       payers: number;
+      expectedPayers: number;
       sweepers: number;
       share: number;
     };
@@ -63,7 +66,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 ">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="px-4 py-4">
@@ -133,18 +136,39 @@ export default function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4 mb-2">
+              <div className="flex justify-between items-end mb-3">
                 <div>
                   <p className="text-xs text-gray-500 uppercase tracking-wide">Collected</p>
                   <p className="text-2xl font-bold text-gray-900">{formatAmount(data.summary.sweeping.collected)}</p>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Share/Sweeper</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatAmount(data.summary.sweeping.share)}</p>
+                <div className="text-right">
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">Expected</p>
+                  <p className="text-lg text-gray-600">{formatAmount(data.summary.sweeping.expected)}</p>
                 </div>
               </div>
-              <p className="text-sm text-gray-500">
-                {data.summary.sweeping.payers} pay • {data.summary.sweeping.sweepers} sweep
+
+              {/* Progress bar */}
+              <div className="bg-gray-100 rounded-full h-2 overflow-hidden mb-3">
+                <div
+                  className="bg-blue-500 h-full rounded-full transition-all"
+                  style={{ width: `${data.summary.sweeping.percentPaid}%` }}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-50 rounded-lg p-2.5 text-center">
+                  <p className="text-xs text-gray-500">Paid</p>
+                  <p className="text-sm font-bold text-gray-900">
+                    {data.summary.sweeping.payers}/{data.summary.sweeping.expectedPayers}
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-2.5 text-center">
+                  <p className="text-xs text-gray-500">Share/Sweeper</p>
+                  <p className="text-sm font-bold text-gray-900">{formatAmount(data.summary.sweeping.share)}</p>
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 mt-2 text-center">
+                {data.summary.sweeping.sweepers} {data.summary.sweeping.sweepers === 1 ? 'sweeper' : 'sweepers'} • {data.summary.sweeping.percentPaid}% collected
               </p>
             </CardContent>
           </Card>
