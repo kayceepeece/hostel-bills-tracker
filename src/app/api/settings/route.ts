@@ -9,6 +9,8 @@ const DEFAULTS: Record<string, string> = {
   light_bill_expected_amount: '0',
   light_bill_default_amount: '0',
   electricity_rate: '73.5',
+  sweeping_show_card: 'true',
+  sweeping_amount: '1500',
 };
 
 // GET - read all settings

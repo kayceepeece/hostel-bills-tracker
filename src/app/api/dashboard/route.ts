@@ -19,6 +19,8 @@ export async function GET(request: Request) {
     const expectedAmount = parseInt(settings.light_bill_expected_amount || '0', 10);
     const defaultLightAmount = parseInt(settings.light_bill_default_amount || '0', 10);
     const electricityRate = parseFloat(settings.electricity_rate || '73.5');
+    const showSweepingCard = settings.sweeping_show_card !== 'false';
+    const sweepingAmount = parseInt(settings.sweeping_amount || '1500', 10);
 
     // Get all members
     const allMembers = await db.select().from(members);
@@ -85,7 +87,7 @@ export async function GET(request: Request) {
     const sweepers = allMembers.filter(m => m.sweepingRole === 'sweep');
     const sweepingCollected = sweepingPayers.reduce((sum, p) => sum + (p.amount || 0), 0);
     const sweepingShare = sweepers.length > 0 ? Math.round(sweepingCollected / sweepers.length) : 0;
-    const sweepingExpected = allPayers.length * 1500;
+    const sweepingExpected = allPayers.length * sweepingAmount;
     const sweepingPercentPaid = sweepingExpected > 0 ? Math.round((sweepingCollected / sweepingExpected) * 100) : 0;
     
     const environmentalCollected = environmental.reduce((sum, p) => sum + p.amount, 0);
@@ -95,6 +97,8 @@ export async function GET(request: Request) {
       settings: {
         lightBillShowExpected: showExpected,
         lightBillExpectedAmount: expectedAmount,
+        sweepingShowCard: showSweepingCard,
+        sweepingAmount,
       },
       summary: {
         lightBill: {

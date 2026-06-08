@@ -10,6 +10,8 @@ interface Settings {
   light_bill_expected_amount: string;
   light_bill_default_amount: string;
   electricity_rate: string;
+  sweeping_show_card: string;
+  sweeping_amount: string;
 }
 
 function AdminContent() {
@@ -193,6 +195,45 @@ function AdminContent() {
                   </div>
                 </>
               )}
+
+              {/* Sweeping Card */}
+              <div className="border-t border-gray-200 pt-4 mt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Show Sweeping on Dashboard</p>
+                    <p className="text-xs text-gray-500">Display sweeping card on home page</p>
+                  </div>
+                  <button
+                    onClick={() => setSettings({
+                      ...settings,
+                      sweeping_show_card: settings.sweeping_show_card === 'true' ? 'false' : 'true',
+                    })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      settings.sweeping_show_card === 'true' ? 'bg-emerald-500' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      settings.sweeping_show_card === 'true' ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+                {settings.sweeping_show_card === 'true' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-1">Per-Payer Amount (₦)</label>
+                    <p className="text-xs text-gray-500 mb-2">Amount each payer contributes monthly</p>
+                    <input
+                      type="number"
+                      value={settings.sweeping_amount}
+                      onChange={(e) => setSettings({
+                        ...settings,
+                        sweeping_amount: e.target.value,
+                      })}
+                      className="w-full bg-gray-50 border border-gray-200 text-gray-900 px-4 py-2.5 rounded-lg text-sm"
+                      placeholder="e.g. 1500"
+                    />
+                  </div>
+                )}
+              </div>
 
               {/* Electricity Rate */}
               <div className="border-t border-gray-200 pt-4 mt-4">
